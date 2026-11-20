@@ -1,0 +1,1011 @@
+create database uol_canteen;
+use uol_canteen;
+
+-- 1. STRONG ENTITIES
+
+create table student(
+    student_id varchar(15) primary key,
+    first_name varchar(40) not null,
+    last_name varchar(40) not null,
+    street varchar(80),
+    city varchar(40),
+    cnic varchar(15) unique,
+    email varchar(80) unique not null,
+    enrollment_date date not null,
+    student_status varchar(15) check (student_status in ('Active', 'Suspended', 'Graduated'))
+);
+
+create table employee(
+    emp_id varchar(10) primary key,
+    first_name varchar(40) not null,
+    last_name varchar(40) not null,
+    emerg_name varchar(50),
+    emerg_phone varchar(20),
+    cnic varchar(15) unique,
+    email varchar(80) unique,
+    hire_date date not null,
+    salary decimal(10,2) check (salary >= 0),
+    emp_status varchar(15) check (emp_status in ('Active', 'On-leave', 'Resigned'))
+);
+
+create table stall(
+    stall_id varchar(10) primary key,
+    stall_name varchar(60) not null,
+    block varchar(20),
+    wing varchar(20),
+    location_block varchar(30),
+    floor_no int,
+    opening_time time,
+    closing_time time,
+    is_active boolean default true,
+    monthly_rent decimal(12,2)
+);
+
+create table vendor(
+    vendor_id varchar(10) primary key,
+    company_name varchar(100) not null,
+    street varchar(80),
+    city varchar(40),
+    postal_code varchar(10),
+    contact_name varchar(50),
+    contact_phone varchar(20),
+    contract_date date,
+    ntn varchar(20) unique,
+    is_approved boolean default false,
+    license_expiry date
+);
+
+create table food_item(
+    item_id varchar(12) primary key,
+    item_name varchar(80) not null,
+    calories int,
+    protein_gram decimal(6,2),
+    unit_price decimal(10,2) check (unit_price >= 0),
+    category varchar(30),
+    is_available boolean default true,
+    prep_time int check (prep_time >= 0),
+    last_restock_date date
+);
+
+create table canteen_order(
+    order_id varchar(14) primary key,
+    order_datetime datetime not null,
+    order_type varchar(12) check (order_type in ('Dine-in', 'Takeaway')),
+    order_channel varchar(12),
+    table_no varchar(10),
+    status varchar(12) check (status in ('Placed', 'Preparing', 'Served', 'Cancelled')),
+    served_time datetime,
+    payment_status varchar(12) check (payment_status in ('Paid', 'Unpaid', 'Refunded')),
+    student_id varchar(15),
+    emp_id varchar(10),
+    stall_id varchar(10),
+    foreign key (student_id) references student(student_id),
+    foreign key (emp_id) references employee(emp_id),
+    foreign key (stall_id) references stall(stall_id)
+);
+
+create table payment(
+    payment_id varchar(14) primary key,
+    pay_datetime datetime not null,
+    amount decimal(12,2) check (amount > 0),
+    pay_method varchar(8) check (pay_method in ('Cash', 'Card', 'Wallet')),
+    pay_status varchar(12) check (pay_status in ('Completed', 'Pending', 'Failed')),
+    cash_received decimal(12,2),
+    coupon_code varchar(20),
+    tip_amount decimal(10,2) default 0.00,
+    order_id varchar(14) unique not null,
+    student_id varchar(15),
+    received_by_emp_id varchar(10),
+    foreign key (order_id) references canteen_order(order_id),
+    foreign key (student_id) references student(student_id),
+    foreign key (received_by_emp_id) references employee(emp_id)
+);
+
+create table feedback(
+    feedback_id varchar(14) primary key,
+    student_id varchar(15),
+    order_id varchar(14),
+    item_id varchar(12),
+    rating int check (rating between 1 and 5),
+    comment varchar(300),
+    feedback_datetime datetime,
+    response_status varchar(12) check (response_status in ('Open', 'Replied', 'Closed')),
+    response_text varchar(300),
+    is_anonymous boolean default false,
+    helpful_count int default 0,
+    foreign key (student_id) references student(student_id),
+    foreign key (order_id) references canteen_order(order_id),
+    foreign key (item_id) references food_item(item_id)
+);
+
+
+-- 2. WEAK ENTITIES
+
+create table menu(
+    stall_id varchar(10),
+    menu_id varchar(10),
+    menu_date date not null,
+    meal_type varchar(15) check (meal_type in ('Breakfast', 'Lunch', 'Snacks')),
+    is_active boolean default true,
+    publish_time datetime,
+    menu_version int default 1,
+    special_note varchar(160),
+    approved_by varchar(10),
+    primary key (stall_id, menu_id),
+    foreign key (stall_id) references stall(stall_id),
+    foreign key (approved_by) references employee(emp_id)
+);
+
+create table order_line(
+    order_id varchar(14),
+    line_no int,
+    item_id varchar(12) not null,
+    quantity int check (quantity > 0),
+    unit_price decimal(10,2) check (unit_price >= 0),
+    discount decimal(10,2) default 0.00,
+    special_instructions varchar(160),
+    serving_size varchar(12),
+    kot_status varchar(15),
+    preparation_note varchar(160),
+    primary key (order_id, line_no),
+    foreign key (order_id) references canteen_order(order_id),
+    foreign key (item_id) references food_item(item_id)
+);
+
+
+-- 3. MULTIVALUED ATTRIBUTES
+
+create table student_phone(
+    student_id varchar(15),
+    phone varchar(20),
+    primary key (student_id, phone),
+    foreign key (student_id) references student(student_id)
+);
+
+create table employee_phone(
+    emp_id varchar(10),
+    phone varchar(20),
+    primary key (emp_id, phone),
+    foreign key (emp_id) references employee(emp_id)
+);
+
+create table vendor_phone(
+    vendor_id varchar(10),
+    phone varchar(20),
+    primary key (vendor_id, phone),
+    foreign key (vendor_id) references vendor(vendor_id)
+);
+
+create table food_item_allergen(
+    item_id varchar(12),
+    allergen varchar(50),
+    primary key (item_id, allergen),
+    foreign key (item_id) references food_item(item_id)
+);
+
+create table stall_facility(
+    stall_id varchar(10),
+    facility varchar(50),
+    primary key (stall_id, facility),
+    foreign key (stall_id) references stall(stall_id)
+);
+
+
+-- 4. M:N RELATIONSHIPS
+
+create table works_at(
+    emp_id varchar(10),
+    stall_id varchar(10),
+    shift_hours int,
+    primary key (emp_id, stall_id),
+    foreign key (emp_id) references employee(emp_id),
+    foreign key (stall_id) references stall(stall_id)
+);
+
+create table menu_item(
+    stall_id varchar(10),
+    menu_id varchar(10),
+    item_id varchar(12),
+    offered_price decimal(10,2) check (offered_price >= 0),
+    primary key (stall_id, menu_id, item_id),
+    foreign key (stall_id, menu_id) references menu(stall_id, menu_id),
+    foreign key (item_id) references food_item(item_id)
+);
+
+create table supplies(
+    vendor_id varchar(10),
+    item_id varchar(12),
+    supply_date date,
+    supply_price decimal(10,2),
+    primary key (vendor_id, item_id, supply_date),
+    foreign key (vendor_id) references vendor(vendor_id),
+    foreign key (item_id) references food_item(item_id)
+);
+
+
+-- 5. SUBCLASSES (EER Mapping)
+
+create table manager(
+    emp_id varchar(10) primary key,
+    mgr_level varchar(20),
+    approved_budget decimal(12,2),
+    foreign key (emp_id) references employee(emp_id)
+);
+
+create table cook(
+    emp_id varchar(10) primary key,
+    specialty varchar(50),
+    hygiene_cert_no varchar(20),
+    cert_expiry date,
+    foreign key (emp_id) references employee(emp_id)
+);
+
+create table cashier(
+    emp_id varchar(10) primary key,
+    counter_no int,
+    drawer_code varchar(10),
+    foreign key (emp_id) references employee(emp_id)
+);
+
+create table meal(
+    item_id varchar(12) primary key,
+    cuisine varchar(30),
+    spice_level varchar(15),
+    is_vegetarian boolean,
+    foreign key (item_id) references food_item(item_id)
+);
+
+create table beverage(
+    item_id varchar(12) primary key,
+    size varchar(15),
+    is_chilled boolean,
+    caffeine_level varchar(15),
+    foreign key (item_id) references food_item(item_id)
+);
+
+create table snack(
+    item_id varchar(12) primary key,
+    is_fried boolean,
+    is_baked boolean,
+    portion_weight_grams int,
+    foreign key (item_id) references food_item(item_id)
+);
+
+create table cash_payment(
+    payment_id varchar(14) primary key,
+    received_by_emp_id varchar(10),
+    cash_received decimal(12,2),
+    foreign key (payment_id) references payment(payment_id),
+    foreign key (received_by_emp_id) references employee(emp_id)
+);
+
+create table card_payment(
+    payment_id varchar(14) primary key,
+    card_no varchar(20),
+    card_type varchar(15),
+    auth_code varchar(15),
+    bank_name varchar(50),
+    foreign key (payment_id) references payment(payment_id)
+);
+
+create table wallet_payment(
+    payment_id varchar(14) primary key,
+    wallet_app varchar(30),
+    txn_ref varchar(30),
+    wallet_account varchar(30),
+    provider_fee decimal(10,2),
+    foreign key (payment_id) references payment(payment_id)
+);
+
+-- 1. STUDENT (30 records)
+insert into student values 
+('S01','Ali','Khan','Street 1','Lahore','3520111111111','ali@uol.edu.pk','2024-01-01','Active'),
+('S02','Sara','Ahmed','Street 2','Lahore','3520122222222','sara@uol.edu.pk','2024-01-02','Active'),
+('S03','Usman','Raza','Street 3','Lahore','3520133333333','usman@uol.edu.pk','2024-01-03','Suspended'),
+('S04','Hina','Tariq','Street 4','Lahore','3520144444444','hina@uol.edu.pk','2024-01-04','Graduated'),
+('S05','Bilal','Ali','Street 5','Lahore','3520155555555','bilal@uol.edu.pk','2024-01-05','Active'),
+('S06','Ayesha','Khan','Street 6','Lahore','3520166666666','ayesha@uol.edu.pk','2024-01-06','Active'),
+('S07','Zain','Ali','Street 7','Lahore','3520177777777','zain@uol.edu.pk','2024-01-07','Active'),
+('S08','Fatima','Zahra','Street 8','Lahore','3520188888888','fatima@uol.edu.pk','2024-01-08','Active'),
+('S09','Hamza','Sheikh','Street 9','Lahore','3520199999999','hamza@uol.edu.pk','2024-01-09','Active'),
+('S10','Nimra','Khan','Street 10','Lahore','3520110101010','nimra@uol.edu.pk','2024-01-10','Active'),
+('S11','Ali','Raza','Street 11','Lahore','3520111111112','ali2@uol.edu.pk','2024-01-11','Active'),
+('S12','Sara','Ali','Street 12','Lahore','3520112121212','sara2@uol.edu.pk','2024-01-12','Active'),
+('S13','Usman','Tariq','Street 13','Lahore','3520113131313','usman2@uol.edu.pk','2024-01-13','Active'),
+('S14','Hina','Ahmed','Street 14','Lahore','3520114141414','hina2@uol.edu.pk','2024-01-14','Active'),
+('S15','Bilal','Khan','Street 15','Lahore','3520115151515','bilal2@uol.edu.pk','2024-01-15','Active'),
+('S16','Ayesha','Ali','Street 16','Lahore','3520116161616','ayesha2@uol.edu.pk','2024-01-16','Active'),
+('S17','Zain','Ahmed','Street 17','Lahore','3520117171717','zain2@uol.edu.pk','2024-01-17','Active'),
+('S18','Fatima','Khan','Street 18','Lahore','3520118181818','fatima2@uol.edu.pk','2024-01-18','Active'),
+('S19','Hamza','Ali','Street 19','Lahore','3520119191919','hamza2@uol.edu.pk','2024-01-19','Active'),
+('S20','Nimra','Ahmed','Street 20','Lahore','3520120202020','nimra2@uol.edu.pk','2024-01-20','Active'),
+('S21','Ali','Sheikh','Street 21','Lahore','3520121212121','ali3@uol.edu.pk','2024-01-21','Active'),
+('S22','Sara','Khan','Street 22','Lahore','3520122222223','sara3@uol.edu.pk','2024-01-22','Active'),
+('S23','Usman','Ali','Street 23','Lahore','3520123232323','usman3@uol.edu.pk','2024-01-23','Active'),
+('S24','Hina','Ahmed','Street 24','Lahore','3520124242424','hina3@uol.edu.pk','2024-01-24','Active'),
+('S25','Bilal','Tariq','Street 25','Lahore','3520125252525','bilal3@uol.edu.pk','2024-01-25','Active'),
+('S26','Ayesha','Khan','Street 26','Lahore','3520126262626','ayesha3@uol.edu.pk','2024-01-26','Active'),
+('S27','Zain','Ali','Street 27','Lahore','3520127272727','zain3@uol.edu.pk','2024-01-27','Active'),
+('S28','Fatima','Ahmed','Street 28','Lahore','3520128282828','fatima3@uol.edu.pk','2024-01-28','Active'),
+('S29','Hamza','Khan','Street 29','Lahore','3520129292929','hamza3@uol.edu.pk','2024-01-29','Active'),
+('S30','Nimra','Ali','Street 30','Lahore','3520130303030','nimra3@uol.edu.pk','2024-01-30','Active');
+
+-- 2. EMPLOYEE (30 records)
+insert into employee values 
+('E01','Ahmed','Khan','Emerg1','0300111','111111','ahmed@uol.edu.pk','2020-01-01',50000,'Active'),
+('E02','Fatima','Zahra','Emerg2','0300222','222222','fatima@uol.edu.pk','2021-01-01',60000,'Active'),
+('E03','Zain','Ali','Emerg3','0300333','333333','zain@uol.edu.pk','2022-01-01',45000,'Active'),
+('E04','Ayesha','Khan','Emerg4','0300444','444444','ayesha@uol.edu.pk','2019-01-01',70000,'On-leave'),
+('E05','Hamza','Sheikh','Emerg5','0300555','555555','hamza@uol.edu.pk','2023-01-01',40000,'Active'),
+('E06','Ali','Raza','E6','0300666','666666','e6@uol.edu.pk','2020-02-01',51000,'Active'),
+('E07','Sara','Ahmed','E7','0300777','777777','e7@uol.edu.pk','2021-03-01',52000,'Active'),
+('E08','Usman','Tariq','E8','0300888','888888','e8@uol.edu.pk','2022-04-01',53000,'Active'),
+('E09','Hina','Ali','E9','0300999','999999','e9@uol.edu.pk','2019-05-01',54000,'Active'),
+('E10','Bilal','Khan','E10','0301010','101010','e10@uol.edu.pk','2023-06-01',55000,'Active'),
+('E11','Ayesha','Ali','E11','0301111','111112','e11@uol.edu.pk','2020-07-01',56000,'Active'),
+('E12','Zain','Ahmed','E12','0301212','121212','e12@uol.edu.pk','2021-08-01',57000,'Active'),
+('E13','Fatima','Khan','E13','0301313','131313','e13@uol.edu.pk','2022-09-01',58000,'Active'),
+('E14','Hamza','Ali','E14','0301414','141414','e14@uol.edu.pk','2019-10-01',59000,'Active'),
+('E15','Nimra','Ahmed','E15','0301515','151515','e15@uol.edu.pk','2023-11-01',60000,'Active'),
+('E16','Ali','Khan','E16','0301616','161616','e16@uol.edu.pk','2020-12-01',61000,'Active'),
+('E17','Sara','Zahra','E17','0301717','171717','e17@uol.edu.pk','2021-01-15',62000,'Active'),
+('E18','Usman','Khan','E18','0301818','181818','e18@uol.edu.pk','2022-02-15',63000,'Active'),
+('E19','Hina','Ahmed','E19','0301919','191919','e19@uol.edu.pk','2019-03-15',64000,'Active'),
+('E20','Bilal','Ali','E20','0302020','202020','e20@uol.edu.pk','2023-04-15',65000,'Active'),
+('E21','Ayesha','Tariq','E21','0302121','212121','e21@uol.edu.pk','2020-05-15',66000,'Active'),
+('E22','Zain','Khan','E22','0302222','222223','e22@uol.edu.pk','2021-06-15',67000,'Active'),
+('E23','Fatima','Ali','E23','0302323','232323','e23@uol.edu.pk','2022-07-15',68000,'Active'),
+('E24','Hamza','Ahmed','E24','0302424','242424','e24@uol.edu.pk','2019-08-15',69000,'Active'),
+('E25','Nimra','Khan','E25','0302525','252525','e25@uol.edu.pk','2023-09-15',70000,'Active'),
+('E26','Ali','Tariq','E26','0302626','262626','e26@uol.edu.pk','2020-10-15',71000,'Active'),
+('E27','Sara','Khan','E27','0302727','272727','e27@uol.edu.pk','2021-11-15',72000,'Active'),
+('E28','Usman','Ahmed','E28','0302828','282828','e28@uol.edu.pk','2022-12-15',73000,'Active'),
+('E29','Hina','Khan','E29','0302929','292929','e29@uol.edu.pk','2019-01-15',74000,'Active'),
+('E30','Bilal','Ahmed','E30','0303030','303030','e30@uol.edu.pk','2023-02-15',75000,'Active');
+
+-- 3. STALL (30 records)
+insert into stall values 
+('ST01','Block A Cafe','A','Wing1','Block A',1,'08:00:00','20:00:00',true,100000),
+('ST02','Block B Cafe','B','Wing2','Block B',1,'08:00:00','20:00:00',true,120000),
+('ST03','Juice Corner','C','Wing1','Block C',2,'09:00:00','18:00:00',true,50000),
+('ST04','Snack Bar','D','Wing3','Block D',1,'08:00:00','22:00:00',false,80000),
+('ST05','Main Canteen','Main','Wing0','Main',0,'07:00:00','23:00:00',true,200000),
+('ST06','Tea Point','E','Wing1','Block E',1,'08:00:00','20:00:00',true,60000),
+('ST07','Fast Food','F','Wing2','Block F',1,'08:00:00','20:00:00',true,110000),
+('ST08','Desi Food','G','Wing1','Block G',2,'09:00:00','18:00:00',true,70000),
+('ST09','Bakery','H','Wing3','Block H',1,'08:00:00','22:00:00',false,90000),
+('ST10','Cold Drinks','I','Wing0','Main',0,'07:00:00','23:00:00',true,40000),
+('ST11','Stall 11','J','Wing1','Block J',1,'08:00:00','20:00:00',true,100000),
+('ST12','Stall 12','K','Wing2','Block K',1,'08:00:00','20:00:00',true,120000),
+('ST13','Stall 13','L','Wing1','Block L',2,'09:00:00','18:00:00',true,50000),
+('ST14','Stall 14','M','Wing3','Block M',1,'08:00:00','22:00:00',false,80000),
+('ST15','Stall 15','N','Wing0','Main',0,'07:00:00','23:00:00',true,200000),
+('ST16','Stall 16','O','Wing1','Block O',1,'08:00:00','20:00:00',true,100000),
+('ST17','Stall 17','P','Wing2','Block P',1,'08:00:00','20:00:00',true,120000),
+('ST18','Stall 18','Q','Wing1','Block Q',2,'09:00:00','18:00:00',true,50000),
+('ST19','Stall 19','R','Wing3','Block R',1,'08:00:00','22:00:00',false,80000),
+('ST20','Stall 20','S','Wing0','Main',0,'07:00:00','23:00:00',true,200000),
+('ST21','Stall 21','T','Wing1','Block T',1,'08:00:00','20:00:00',true,100000),
+('ST22','Stall 22','U','Wing2','Block U',1,'08:00:00','20:00:00',true,120000),
+('ST23','Stall 23','V','Wing1','Block V',2,'09:00:00','18:00:00',true,50000),
+('ST24','Stall 24','W','Wing3','Block W',1,'08:00:00','22:00:00',false,80000),
+('ST25','Stall 25','X','Wing0','Main',0,'07:00:00','23:00:00',true,200000),
+('ST26','Stall 26','Y','Wing1','Block Y',1,'08:00:00','20:00:00',true,100000),
+('ST27','Stall 27','Z','Wing2','Block Z',1,'08:00:00','20:00:00',true,120000),
+('ST28','Stall 28','AA','Wing1','Block AA',2,'09:00:00','18:00:00',true,50000),
+('ST29','Stall 29','BB','Wing3','Block BB',1,'08:00:00','22:00:00',false,80000),
+('ST30','Stall 30','CC','Wing0','Main',0,'07:00:00','23:00:00',true,200000);
+
+-- 4. VENDOR (30 records)
+insert into vendor values 
+('V01','Fresh Foods','St1','Lahore','54000','Bilal','0301','2024-01-01','NTN1',true,'2026-01-01'),
+('V02','Bake House','St2','Lahore','54000','Ali','0302','2024-01-02','NTN2',true,'2026-01-02'),
+('V03','Dairy Farms','St3','Lahore','54000','Sara','0303','2024-01-03','NTN3',false,'2026-01-03'),
+('V04','Meat Shop','St4','Lahore','54000','Usman','0304','2024-01-04','NTN4',true,'2026-01-04'),
+('V05','Veggie Mart','St5','Lahore','54000','Hina','0305','2024-01-05','NTN5',true,'2026-01-05'),
+('V06','Vendor 6','St6','Lahore','54000','Bilal','0306','2024-01-06','NTN6',true,'2026-01-06'),
+('V07','Vendor 7','St7','Lahore','54000','Ali','0307','2024-01-07','NTN7',true,'2026-01-07'),
+('V08','Vendor 8','St8','Lahore','54000','Sara','0308','2024-01-08','NTN8',true,'2026-01-08'),
+('V09','Vendor 9','St9','Lahore','54000','Usman','0309','2024-01-09','NTN9',true,'2026-01-09'),
+('V10','Vendor 10','St10','Lahore','54000','Hina','0310','2024-01-10','NTN10',true,'2026-01-10'),
+('V11','Vendor 11','St11','Lahore','54000','Bilal','0311','2024-01-11','NTN11',true,'2026-01-11'),
+('V12','Vendor 12','St12','Lahore','54000','Ali','0312','2024-01-12','NTN12',true,'2026-01-12'),
+('V13','Vendor 13','St13','Lahore','54000','Sara','0313','2024-01-13','NTN13',true,'2026-01-13'),
+('V14','Vendor 14','St14','Lahore','54000','Usman','0314','2024-01-14','NTN14',true,'2026-01-14'),
+('V15','Vendor 15','St15','Lahore','54000','Hina','0315','2024-01-15','NTN15',true,'2026-01-15'),
+('V16','Vendor 16','St16','Lahore','54000','Bilal','0316','2024-01-16','NTN16',true,'2026-01-16'),
+('V17','Vendor 17','St17','Lahore','54000','Ali','0317','2024-01-17','NTN17',true,'2026-01-17'),
+('V18','Vendor 18','St18','Lahore','54000','Sara','0318','2024-01-18','NTN18',true,'2026-01-18'),
+('V19','Vendor 19','St19','Lahore','54000','Usman','0319','2024-01-19','NTN19',true,'2026-01-19'),
+('V20','Vendor 20','St20','Lahore','54000','Hina','0320','2024-01-20','NTN20',true,'2026-01-20'),
+('V21','Vendor 21','St21','Lahore','54000','Bilal','0321','2024-01-21','NTN21',true,'2026-01-21'),
+('V22','Vendor 22','St22','Lahore','54000','Ali','0322','2024-01-22','NTN22',true,'2026-01-22'),
+('V23','Vendor 23','St23','Lahore','54000','Sara','0323','2024-01-23','NTN23',true,'2026-01-23'),
+('V24','Vendor 24','St24','Lahore','54000','Usman','0324','2024-01-24','NTN24',true,'2026-01-24'),
+('V25','Vendor 25','St25','Lahore','54000','Hina','0325','2024-01-25','NTN25',true,'2026-01-25'),
+('V26','Vendor 26','St26','Lahore','54000','Bilal','0326','2024-01-26','NTN26',true,'2026-01-26'),
+('V27','Vendor 27','St27','Lahore','54000','Ali','0327','2024-01-27','NTN27',true,'2026-01-27'),
+('V28','Vendor 28','St28','Lahore','54000','Sara','0328','2024-01-28','NTN28',true,'2026-01-28'),
+('V29','Vendor 29','St29','Lahore','54000','Usman','0329','2024-01-29','NTN29',true,'2026-01-29'),
+('V30','Vendor 30','St30','Lahore','54000','Hina','0330','2024-01-30','NTN30',true,'2026-01-30');
+
+-- 5. FOOD_ITEM (30 records)
+insert into food_item values 
+('F01','Chicken Biryani',500,20,350,'Desi',true,15,'2024-10-01'),
+('F02','Zinger Burger',450,25,400,'Fast Food',true,10,'2024-10-01'),
+('F03','Pepsi 500ml',150,0,80,'Drink',true,1,'2024-10-01'),
+('F04','Fries',300,5,150,'Fast Food',true,5,'2024-10-01'),
+('F05','Chocolate Cake',350,8,200,'Dessert',true,2,'2024-10-01'),
+('F06','Item 6',200,10,100,'Desi',true,10,'2024-10-01'),
+('F07','Item 7',250,15,120,'Fast Food',true,12,'2024-10-01'),
+('F08','Item 8',100,0,50,'Drink',true,1,'2024-10-01'),
+('F09','Item 9',300,5,180,'Fast Food',true,6,'2024-10-01'),
+('F10','Item 10',400,8,250,'Dessert',true,3,'2024-10-01'),
+('F11','Item 11',500,20,350,'Desi',true,15,'2024-10-01'),
+('F12','Item 12',450,25,400,'Fast Food',true,10,'2024-10-01'),
+('F13','Item 13',150,0,80,'Drink',true,1,'2024-10-01'),
+('F14','Item 14',300,5,150,'Fast Food',true,5,'2024-10-01'),
+('F15','Item 15',350,8,200,'Dessert',true,2,'2024-10-01'),
+('F16','Item 16',200,10,100,'Desi',true,10,'2024-10-01'),
+('F17','Item 17',250,15,120,'Fast Food',true,12,'2024-10-01'),
+('F18','Item 18',100,0,50,'Drink',true,1,'2024-10-01'),
+('F19','Item 19',300,5,180,'Fast Food',true,6,'2024-10-01'),
+('F20','Item 20',400,8,250,'Dessert',true,3,'2024-10-01'),
+('F21','Item 21',500,20,350,'Desi',true,15,'2024-10-01'),
+('F22','Item 22',450,25,400,'Fast Food',true,10,'2024-10-01'),
+('F23','Item 23',150,0,80,'Drink',true,1,'2024-10-01'),
+('F24','Item 24',300,5,150,'Fast Food',true,5,'2024-10-01'),
+('F25','Item 25',350,8,200,'Dessert',true,2,'2024-10-01'),
+('F26','Item 26',200,10,100,'Desi',true,10,'2024-10-01'),
+('F27','Item 27',250,15,120,'Fast Food',true,12,'2024-10-01'),
+('F28','Item 28',100,0,50,'Drink',true,1,'2024-10-01'),
+('F29','Item 29',300,5,180,'Fast Food',true,6,'2024-10-01'),
+('F30','Item 30',400,8,250,'Dessert',true,3,'2024-10-01');
+
+-- 6. CANTEEN_ORDER (30 records)
+insert into canteen_order values 
+('O01','2024-10-25 13:00:00','Dine-in','Counter','T1','Served','2024-10-25 13:15:00','Paid','S01','E01','ST01'),
+('O02','2024-10-25 13:30:00','Takeaway','App',NULL,'Preparing',NULL,'Unpaid','S02','E03','ST02'),
+('O03','2024-10-25 14:00:00','Dine-in','Counter','T2','Placed',NULL,'Unpaid','S03','E01','ST01'),
+('O04','2024-10-25 14:15:00','Dine-in','Counter','T3','Cancelled',NULL,'Refunded','S04','E03','ST03'),
+('O05','2024-10-25 14:30:00','Takeaway','Counter',NULL,'Served','2024-10-25 14:45:00','Paid','S05','E01','ST05'),
+('O06','2024-10-25 15:00:00','Dine-in','Counter','T4','Served','2024-10-25 15:20:00','Paid','S06','E02','ST06'),
+('O07','2024-10-25 15:10:00','Takeaway','App',NULL,'Preparing',NULL,'Unpaid','S07','E04','ST07'),
+('O08','2024-10-25 15:20:00','Dine-in','Counter','T5','Placed',NULL,'Unpaid','S08','E05','ST08'),
+('O09','2024-10-25 15:30:00','Dine-in','Counter','T6','Cancelled',NULL,'Refunded','S09','E06','ST09'),
+('O10','2024-10-25 15:40:00','Takeaway','Counter',NULL,'Served','2024-10-25 16:00:00','Paid','S10','E07','ST10'),
+('O11','2024-10-25 16:00:00','Dine-in','Counter','T7','Served','2024-10-25 16:15:00','Paid','S11','E08','ST11'),
+('O12','2024-10-25 16:10:00','Takeaway','App',NULL,'Preparing',NULL,'Unpaid','S12','E09','ST12'),
+('O13','2024-10-25 16:20:00','Dine-in','Counter','T8','Placed',NULL,'Unpaid','S13','E10','ST13'),
+('O14','2024-10-25 16:30:00','Dine-in','Counter','T9','Cancelled',NULL,'Refunded','S14','E11','ST14'),
+('O15','2024-10-25 16:40:00','Takeaway','Counter',NULL,'Served','2024-10-25 17:00:00','Paid','S15','E12','ST15'),
+('O16','2024-10-25 17:00:00','Dine-in','Counter','T10','Served','2024-10-25 17:15:00','Paid','S16','E13','ST16'),
+('O17','2024-10-25 17:10:00','Takeaway','App',NULL,'Preparing',NULL,'Unpaid','S17','E14','ST17'),
+('O18','2024-10-25 17:20:00','Dine-in','Counter','T11','Placed',NULL,'Unpaid','S18','E15','ST18'),
+('O19','2024-10-25 17:30:00','Dine-in','Counter','T12','Cancelled',NULL,'Refunded','S19','E16','ST19'),
+('O20','2024-10-25 17:40:00','Takeaway','Counter',NULL,'Served','2024-10-25 18:00:00','Paid','S20','E17','ST20'),
+('O21','2024-10-25 18:00:00','Dine-in','Counter','T13','Served','2024-10-25 18:15:00','Paid','S21','E18','ST21'),
+('O22','2024-10-25 18:10:00','Takeaway','App',NULL,'Preparing',NULL,'Unpaid','S22','E19','ST22'),
+('O23','2024-10-25 18:20:00','Dine-in','Counter','T14','Placed',NULL,'Unpaid','S23','E20','ST23'),
+('O24','2024-10-25 18:30:00','Dine-in','Counter','T15','Cancelled',NULL,'Refunded','S24','E21','ST24'),
+('O25','2024-10-25 18:40:00','Takeaway','Counter',NULL,'Served','2024-10-25 19:00:00','Paid','S25','E22','ST25'),
+('O26','2024-10-25 19:00:00','Dine-in','Counter','T16','Served','2024-10-25 19:15:00','Paid','S26','E23','ST26'),
+('O27','2024-10-25 19:10:00','Takeaway','App',NULL,'Preparing',NULL,'Unpaid','S27','E24','ST27'),
+('O28','2024-10-25 19:20:00','Dine-in','Counter','T17','Placed',NULL,'Unpaid','S28','E25','ST28'),
+('O29','2024-10-25 19:30:00','Dine-in','Counter','T18','Cancelled',NULL,'Refunded','S29','E26','ST29'),
+('O30','2024-10-25 19:40:00','Takeaway','Counter',NULL,'Served','2024-10-25 20:00:00','Paid','S30','E27','ST30');
+
+-- 7. PAYMENT (30 records)
+insert into payment values 
+('P01','2024-10-25 13:15:00',350,'Cash','Completed',500,NULL,0,'O01','S01','E01'),
+('P02','2024-10-25 14:45:00',450,'Card','Completed',NULL,NULL,0,'O05','S05','E01'),
+('P03','2024-10-25 14:50:00',200,'Wallet','Completed',NULL,NULL,0,'O04','S04','E03'),
+('P04','2024-10-25 15:00:00',150,'Cash','Pending',200,NULL,0,'O02','S02','E03'),
+('P05','2024-10-25 15:10:00',100,'Card','Failed',NULL,NULL,0,'O03','S03','E01'),
+('P06','2024-10-25 15:20:00',400,'Wallet','Completed',NULL,NULL,0,'O06','S06','E02'),
+('P07','2024-10-25 15:30:00',250,'Cash','Completed',300,NULL,0,'O07','S07','E04'),
+('P08','2024-10-25 15:40:00',350,'Card','Completed',NULL,NULL,0,'O08','S08','E05'),
+('P09','2024-10-25 15:50:00',500,'Wallet','Completed',NULL,NULL,0,'O09','S09','E06'),
+('P10','2024-10-25 16:00:00',180,'Cash','Completed',200,NULL,0,'O10','S10','E07'),
+('P11','2024-10-25 16:15:00',220,'Card','Completed',NULL,NULL,0,'O11','S11','E08'),
+('P12','2024-10-25 16:25:00',300,'Wallet','Completed',NULL,NULL,0,'O12','S12','E09'),
+('P13','2024-10-25 16:35:00',150,'Cash','Completed',200,NULL,0,'O13','S13','E10'),
+('P14','2024-10-25 16:45:00',420,'Card','Completed',NULL,NULL,0,'O14','S14','E11'),
+('P15','2024-10-25 17:00:00',280,'Wallet','Completed',NULL,NULL,0,'O15','S15','E12'),
+('P16','2024-10-25 17:15:00',320,'Cash','Completed',400,NULL,0,'O16','S16','E13'),
+('P17','2024-10-25 17:25:00',190,'Card','Completed',NULL,NULL,0,'O17','S17','E14'),
+('P18','2024-10-25 17:35:00',410,'Wallet','Completed',NULL,NULL,0,'O18','S18','E15'),
+('P19','2024-10-25 17:45:00',160,'Cash','Completed',200,NULL,0,'O19','S19','E16'),
+('P20','2024-10-25 18:00:00',360,'Card','Completed',NULL,NULL,0,'O20','S20','E17'),
+('P21','2024-10-25 18:15:00',240,'Wallet','Completed',NULL,NULL,0,'O21','S21','E18'),
+('P22','2024-10-25 18:25:00',150,'Cash','Completed',200,NULL,0,'O22','S22','E19'),
+('P23','2024-10-25 18:35:00',450,'Card','Completed',NULL,NULL,0,'O23','S23','E20'),
+('P24','2024-10-25 18:45:00',290,'Wallet','Completed',NULL,NULL,0,'O24','S24','E21'),
+('P25','2024-10-25 19:00:00',330,'Cash','Completed',400,NULL,0,'O25','S25','E22'),
+('P26','2024-10-25 19:15:00',210,'Card','Completed',NULL,NULL,0,'O26','S26','E23'),
+('P27','2024-10-25 19:25:00',380,'Wallet','Completed',NULL,NULL,0,'O27','S27','E24'),
+('P28','2024-10-25 19:35:00',170,'Cash','Completed',200,NULL,0,'O28','S28','E25'),
+('P29','2024-10-25 19:45:00',490,'Card','Completed',NULL,NULL,0,'O29','S29','E26'),
+('P30','2024-10-25 20:00:00',310,'Wallet','Completed',NULL,NULL,0,'O30','S30','E27');
+
+-- 8. FEEDBACK (30 records)
+insert into feedback values 
+('FB01','S01','O01','F01',5,'Great food','2024-10-25 14:00:00','Closed','Thanks',false,2),
+('FB02','S02','O02','F02',4,'Good','2024-10-25 14:30:00','Open',NULL,true,0),
+('FB03','S03','O03','F03',3,'Okay','2024-10-25 15:00:00','Open',NULL,false,0),
+('FB04','S04','O04','F04',1,'Bad service','2024-10-25 15:30:00','Replied','Sorry',true,1),
+('FB05','S05','O05','F05',5,'Loved it','2024-10-25 16:00:00','Closed','Thanks',false,5),
+('FB06','S06','O06','F06',4,'Nice','2024-10-25 16:10:00','Closed','Thanks',false,1),
+('FB07','S07','O07','F07',5,'Awesome','2024-10-25 16:20:00','Open',NULL,true,0),
+('FB08','S08','O08','F08',3,'Average','2024-10-25 16:30:00','Open',NULL,false,0),
+('FB09','S09','O09','F09',2,'Cold food','2024-10-25 16:40:00','Replied','Sorry',true,2),
+('FB10','S10','O10','F10',5,'Perfect','2024-10-25 17:00:00','Closed','Thanks',false,4),
+('FB11','S11','O11','F11',4,'Tasty','2024-10-25 17:10:00','Closed','Thanks',false,1),
+('FB12','S12','O12','F12',5,'Superb','2024-10-25 17:20:00','Open',NULL,true,0),
+('FB13','S13','O13','F13',3,'Okay','2024-10-25 17:30:00','Open',NULL,false,0),
+('FB14','S14','O14','F14',1,'Terrible','2024-10-25 17:40:00','Replied','Sorry',true,3),
+('FB15','S15','O15','F15',5,'Great','2024-10-25 18:00:00','Closed','Thanks',false,2),
+('FB16','S16','O16','F16',4,'Good','2024-10-25 18:10:00','Closed','Thanks',false,1),
+('FB17','S17','O17','F17',5,'Excellent','2024-10-25 18:20:00','Open',NULL,true,0),
+('FB18','S18','O18','F18',3,'Average','2024-10-25 18:30:00','Open',NULL,false,0),
+('FB19','S19','O19','F19',2,'Late delivery','2024-10-25 18:40:00','Replied','Sorry',true,1),
+('FB20','S20','O20','F20',5,'Loved it','2024-10-25 19:00:00','Closed','Thanks',false,4),
+('FB21','S21','O21','F21',4,'Nice','2024-10-25 19:10:00','Closed','Thanks',false,2),
+('FB22','S22','O22','F22',5,'Awesome','2024-10-25 19:20:00','Open',NULL,true,0),
+('FB23','S23','O23','F23',3,'Okay','2024-10-25 19:30:00','Open',NULL,false,0),
+('FB24','S24','O24','F24',1,'Bad','2024-10-25 19:40:00','Replied','Sorry',true,5),
+('FB25','S25','O25','F25',5,'Perfect','2024-10-25 20:00:00','Closed','Thanks',false,3),
+('FB26','S26','O26','F26',4,'Good','2024-10-25 20:10:00','Closed','Thanks',false,1),
+('FB27','S27','O27','F27',5,'Great','2024-10-25 20:20:00','Open',NULL,true,0),
+('FB28','S28','O28','F28',3,'Average','2024-10-25 20:30:00','Open',NULL,false,0),
+('FB29','S29','O29','F29',2,'Cold','2024-10-25 20:40:00','Replied','Sorry',true,1),
+('FB30','S30','O30','F30',5,'Superb','2024-10-25 21:00:00','Closed','Thanks',false,2);
+
+-- 9. MENU (30 records)
+insert into menu values 
+('ST01','M01','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST02','M02','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST03','M03','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST04','M04','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST05','M05','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST06','M06','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST07','M07','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST08','M08','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST09','M09','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST10','M10','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST11','M11','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST12','M12','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST13','M13','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST14','M14','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST15','M15','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST16','M16','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST17','M17','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST18','M18','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST19','M19','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST20','M20','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST21','M21','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST22','M22','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST23','M23','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST24','M24','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST25','M25','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST26','M26','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST27','M27','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST28','M28','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST29','M29','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL),
+('ST30','M30','2024-10-25','Lunch',true,'2024-10-24 20:00:00',1,'Special',NULL);
+
+-- 10. ORDER_LINE (30 records)
+insert into order_line values 
+('O01',1,'F01',2,350,0,'None','Regular','Served','None'),
+('O02',1,'F02',1,400,0,'None','Regular','Preparing','None'),
+('O03',1,'F03',1,80,0,'None','Regular','Placed','None'),
+('O04',1,'F04',1,150,0,'None','Regular','Cancelled','None'),
+('O05',1,'F05',1,200,0,'None','Regular','Served','None'),
+('O06',1,'F06',1,100,0,'None','Regular','Served','None'),
+('O07',1,'F07',1,120,0,'None','Regular','Preparing','None'),
+('O08',1,'F08',1,50,0,'None','Regular','Placed','None'),
+('O09',1,'F09',1,180,0,'None','Regular','Cancelled','None'),
+('O10',1,'F10',1,250,0,'None','Regular','Served','None'),
+('O11',1,'F11',1,350,0,'None','Regular','Served','None'),
+('O12',1,'F12',1,400,0,'None','Regular','Preparing','None'),
+('O13',1,'F13',1,80,0,'None','Regular','Placed','None'),
+('O14',1,'F14',1,150,0,'None','Regular','Cancelled','None'),
+('O15',1,'F15',1,200,0,'None','Regular','Served','None'),
+('O16',1,'F16',1,100,0,'None','Regular','Served','None'),
+('O17',1,'F17',1,120,0,'None','Regular','Preparing','None'),
+('O18',1,'F18',1,50,0,'None','Regular','Placed','None'),
+('O19',1,'F19',1,180,0,'None','Regular','Cancelled','None'),
+('O20',1,'F20',1,250,0,'None','Regular','Served','None'),
+('O21',1,'F21',1,350,0,'None','Regular','Served','None'),
+('O22',1,'F22',1,400,0,'None','Regular','Preparing','None'),
+('O23',1,'F23',1,80,0,'None','Regular','Placed','None'),
+('O24',1,'F24',1,150,0,'None','Regular','Cancelled','None'),
+('O25',1,'F25',1,200,0,'None','Regular','Served','None'),
+('O26',1,'F26',1,100,0,'None','Regular','Served','None'),
+('O27',1,'F27',1,120,0,'None','Regular','Preparing','None'),
+('O28',1,'F28',1,50,0,'None','Regular','Placed','None'),
+('O29',1,'F29',1,180,0,'None','Regular','Cancelled','None'),
+('O30',1,'F30',1,250,0,'None','Regular','Served','None');
+
+-- The remaining subclass and M:N tables follow the same logic to maintain referential integrity, 
+-- with 30 records each where applicable.
+
+-- 11. MANAGER (Subclass of Employee)
+insert into manager values ('E01','Level 1',100000),('E02','Level 2',200000),('E03','Level 3',150000),('E04','Level 1',100000),('E05','Level 2',200000),('E06','Level 3',150000),('E07','Level 1',100000),('E08','Level 2',200000),('E09','Level 3',150000),('E10','Level 1',100000),('E11','Level 2',200000),('E12','Level 3',150000),('E13','Level 1',100000),('E14','Level 2',200000),('E15','Level 3',150000),('E16','Level 1',100000),('E17','Level 2',200000),('E18','Level 3',150000),('E19','Level 1',100000),('E20','Level 2',200000),('E21','Level 3',150000),('E22','Level 1',100000),('E23','Level 2',200000),('E24','Level 3',150000),('E25','Level 1',100000),('E26','Level 2',200000),('E27','Level 3',150000),('E28','Level 1',100000),('E29','Level 2',200000),('E30','Level 3',150000);
+
+-- 12. COOK (Subclass of Employee)
+insert into cook values ('E01','BBQ','HC1','2025-01-01'),('E02','Desi','HC2','2025-01-01'),('E03','Fast Food','HC3','2025-01-01'),('E04','BBQ','HC4','2025-01-01'),('E05','Desi','HC5','2025-01-01'),('E06','Fast Food','HC6','2025-01-01'),('E07','BBQ','HC7','2025-01-01'),('E08','Desi','HC8','2025-01-01'),('E09','Fast Food','HC9','2025-01-01'),('E10','BBQ','HC10','2025-01-01'),('E11','Desi','HC11','2025-01-01'),('E12','Fast Food','HC12','2025-01-01'),('E13','BBQ','HC13','2025-01-01'),('E14','Desi','HC14','2025-01-01'),('E15','Fast Food','HC15','2025-01-01'),('E16','BBQ','HC16','2025-01-01'),('E17','Desi','HC17','2025-01-01'),('E18','Fast Food','HC18','2025-01-01'),('E19','BBQ','HC19','2025-01-01'),('E20','Desi','HC20','2025-01-01'),('E21','Fast Food','HC21','2025-01-01'),('E22','BBQ','HC22','2025-01-01'),('E23','Desi','HC23','2025-01-01'),('E24','Fast Food','HC24','2025-01-01'),('E25','BBQ','HC25','2025-01-01'),('E26','Desi','HC26','2025-01-01'),('E27','Fast Food','HC27','2025-01-01'),('E28','BBQ','HC28','2025-01-01'),('E29','Desi','HC29','2025-01-01'),('E30','Fast Food','HC30','2025-01-01');
+
+-- 13. CASHIER (Subclass of Employee)
+insert into cashier values ('E01',1,'D1'),('E02',2,'D2'),('E03',3,'D3'),('E04',4,'D4'),('E05',5,'D5'),('E06',6,'D6'),('E07',7,'D7'),('E08',8,'D8'),('E09',9,'D9'),('E10',10,'D10'),('E11',11,'D11'),('E12',12,'D12'),('E13',13,'D13'),('E14',14,'D14'),('E15',15,'D15'),('E16',16,'D16'),('E17',17,'D17'),('E18',18,'D18'),('E19',19,'D19'),('E20',20,'D20'),('E21',21,'D21'),('E22',22,'D22'),('E23',23,'D23'),('E24',24,'D24'),('E25',25,'D25'),('E26',26,'D26'),('E27',27,'D27'),('E28',28,'D28'),('E29',29,'D29'),('E30',30,'D30');
+
+-- 14. MEAL (Subclass of Food_Item)
+insert into meal values 
+('F01','Desi','High',false),('F02','Fast Food','Low',false),('F03','Desi','Medium',true),('F04','Fast Food','High',false),('F05','Desi','Low',true),
+('F06','Fast Food','Medium',false),('F07','Desi','High',true),('F08','Fast Food','Low',false),('F09','Desi','Medium',true),('F10','Fast Food','High',false),
+('F11','Desi','Low',true),('F12','Fast Food','Medium',false),('F13','Desi','High',true),('F14','Fast Food','Low',false),('F15','Desi','Medium',true),
+('F16','Fast Food','High',false),('F17','Desi','Low',true),('F18','Fast Food','Medium',false),('F19','Desi','High',true),('F20','Fast Food','Low',false),
+('F21','Desi','Medium',true),('F22','Fast Food','High',false),('F23','Desi','Low',true),('F24','Fast Food','Medium',false),('F25','Desi','High',true),
+('F26','Fast Food','Low',false),('F27','Desi','Medium',true),('F28','Fast Food','High',false),('F29','Desi','Low',true),('F30','Fast Food','Medium',false);
+
+-- 15. BEVERAGE (Subclass of Food_Item)
+insert into beverage values 
+('F01','Large',true,'High'),('F02','Medium',false,'Low'),('F03','Small',true,'Medium'),('F04','Large',false,'High'),('F05','Medium',true,'Low'),
+('F06','Small',false,'Medium'),('F07','Large',true,'High'),('F08','Medium',false,'Low'),('F09','Small',true,'Medium'),('F10','Large',false,'High'),
+('F11','Medium',true,'Low'),('F12','Small',false,'Medium'),('F13','Large',true,'High'),('F14','Medium',false,'Low'),('F15','Small',true,'Medium'),
+('F16','Large',false,'High'),('F17','Medium',true,'Low'),('F18','Small',false,'Medium'),('F19','Large',true,'High'),('F20','Medium',false,'Low'),
+('F21','Small',true,'Medium'),('F22','Large',false,'High'),('F23','Medium',true,'Low'),('F24','Small',false,'Medium'),('F25','Large',true,'High'),
+('F26','Medium',false,'Low'),('F27','Small',true,'Medium'),('F28','Large',false,'High'),('F29','Medium',true,'Low'),('F30','Small',false,'Medium');
+
+-- 16. SNACK (Subclass of Food_Item)
+insert into snack values 
+('F01',true,false,100),('F02',false,true,150),('F03',true,false,120),('F04',false,true,130),('F05',true,false,140),
+('F06',false,true,110),('F07',true,false,160),('F08',false,true,170),('F09',true,false,180),('F10',false,true,190),
+('F11',true,false,100),('F12',false,true,150),('F13',true,false,120),('F14',false,true,130),('F15',true,false,140),
+('F16',false,true,110),('F17',true,false,160),('F18',false,true,170),('F19',true,false,180),('F20',false,true,190),
+('F21',true,false,100),('F22',false,true,150),('F23',true,false,120),('F24',false,true,130),('F25',true,false,140),
+('F26',false,true,110),('F27',true,false,160),('F28',false,true,170),('F29',true,false,180),('F30',false,true,190);
+
+-- 17. CASH_PAYMENT
+insert into cash_payment values ('P01','E01',500),('P02','E02',500),('P03','E03',500),('P04','E04',500),('P05','E05',500),('P06','E06',500),('P07','E07',500),('P08','E08',500),('P09','E09',500),('P10','E10',500);
+
+-- 18. CARD_PAYMENT
+insert into card_payment values ('P11','1111','Visa','A1','HBL'),('P12','2222','Master','A2','UBL'),('P13','3333','Visa','A3','MCB'),('P14','4444','Master','A4','HBL'),('P15','5555','Visa','A5','UBL'),('P16','6666','Master','A6','MCB'),('P17','7777','Visa','A7','HBL'),('P18','8888','Master','A8','UBL'),('P19','9999','Visa','A9','MCB'),('P20','1010','Master','A10','HBL');
+
+-- 19. WALLET_PAYMENT
+insert into wallet_payment values ('P21','JazzCash','T1','A1',5),('P22','EasyPaisa','T2','A2',5),('P23','JazzCash','T3','A3',5),('P24','EasyPaisa','T4','A4',5),('P25','JazzCash','T5','A5',5),('P26','EasyPaisa','T6','A6',5),('P27','JazzCash','T7','A7',5),('P28','EasyPaisa','T8','A8',5),('P29','JazzCash','T9','A9',5),('P30','EasyPaisa','T10','A10',5);
+
+-- 20. STUDENT_PHONE (Multivalued)
+insert into student_phone values ('S01','03001111111'),('S02','03002222222'),('S03','03003333333'),('S04','03004444444'),('S05','03005555555'),('S06','03006666666'),('S07','03007777777'),('S08','03008888888'),('S09','03009999999'),('S10','03010101010'),('S11','03011111111'),('S12','03012121212'),('S13','03013131313'),('S14','03014141414'),('S15','03015151515'),('S16','03016161616'),('S17','03017171717'),('S18','03018181818'),('S19','03019191919'),('S20','03020202020'),('S21','03021212121'),('S22','03022222222'),('S23','03023232323'),('S24','03024242424'),('S25','03025252525'),('S26','03026262626'),('S27','03027272727'),('S28','03028282828'),('S29','03029292929'),('S30','03030303030');
+
+-- 21. EMPLOYEE_PHONE (Multivalued)
+insert into employee_phone values ('E01','03111111111'),('E02','03122222222'),('E03','03133333333'),('E04','03144444444'),('E05','03155555555'),('E06','03166666666'),('E07','03177777777'),('E08','03188888888'),('E09','03199999999'),('E10','03110101010'),('E11','03111111112'),('E12','03112121212'),('E13','03113131313'),('E14','03114141414'),('E15','03115151515'),('E16','03116161616'),('E17','03117171717'),('E18','03118181818'),('E19','03119191919'),('E20','03120202020'),('E21','03121212121'),('E22','03122222223'),('E23','03123232323'),('E24','03124242424'),('E25','03125252525'),('E26','03126262626'),('E27','03127272727'),('E28','03128282828'),('E29','03129292929'),('E30','03130303030');
+
+-- 22. VENDOR_PHONE (Multivalued)
+insert into vendor_phone values ('V01','04211111111'),('V02','04222222222'),('V03','04233333333'),('V04','04244444444'),('V05','04255555555'),('V06','04266666666'),('V07','04277777777'),('V08','04288888888'),('V09','04299999999'),('V10','04210101010'),('V11','04211111112'),('V12','04212121212'),('V13','04213131313'),('V14','04214141414'),('V15','04215151515'),('V16','04216161616'),('V17','04217171717'),('V18','04218181818'),('V19','04219191919'),('V20','04220202020'),('V21','04221212121'),('V22','04222222223'),('V23','04223232323'),('V24','04224242424'),('V25','04225252525'),('V26','04226262626'),('V27','04227272727'),('V28','04228282828'),('V29','04229292929'),('V30','04230303030');
+
+-- 23. FOOD_ITEM_ALLERGEN (Multivalued)
+insert into food_item_allergen values ('F01','Nuts'),('F02','Gluten'),('F03','None'),('F04','None'),('F05','Egg'),('F06','Nuts'),('F07','Gluten'),('F08','None'),('F09','None'),('F10','Egg'),('F11','Nuts'),('F12','Gluten'),('F13','None'),('F14','None'),('F15','Egg'),('F16','Nuts'),('F17','Gluten'),('F18','None'),('F19','None'),('F20','Egg'),('F21','Nuts'),('F22','Gluten'),('F23','None'),('F24','None'),('F25','Egg'),('F26','Nuts'),('F27','Gluten'),('F28','None'),('F29','None'),('F30','Egg');
+
+-- 24. STALL_FACILITY (Multivalued)
+insert into stall_facility values ('ST01','AC'),('ST02','Wifi'),('ST03','Seating'),('ST04','Fridge'),('ST05','POS'),('ST06','AC'),('ST07','Wifi'),('ST08','Seating'),('ST09','Fridge'),('ST10','POS'),('ST11','AC'),('ST12','Wifi'),('ST13','Seating'),('ST14','Fridge'),('ST15','POS'),('ST16','AC'),('ST17','Wifi'),('ST18','Seating'),('ST19','Fridge'),('ST20','POS'),('ST21','AC'),('ST22','Wifi'),('ST23','Seating'),('ST24','Fridge'),('ST25','POS'),('ST26','AC'),('ST27','Wifi'),('ST28','Seating'),('ST29','Fridge'),('ST30','POS');
+
+-- 25. WORKS_AT (M:N)
+insert into works_at values ('E01','ST01',8),('E02','ST02',8),('E03','ST03',8),('E04','ST04',8),('E05','ST05',8),('E06','ST06',8),('E07','ST07',8),('E08','ST08',8),('E09','ST09',8),('E10','ST10',8),('E11','ST11',8),('E12','ST12',8),('E13','ST13',8),('E14','ST14',8),('E15','ST15',8),('E16','ST16',8),('E17','ST17',8),('E18','ST18',8),('E19','ST19',8),('E20','ST20',8),('E21','ST21',8),('E22','ST22',8),('E23','ST23',8),('E24','ST24',8),('E25','ST25',8),('E26','ST26',8),('E27','ST27',8),('E28','ST28',8),('E29','ST29',8),('E30','ST30',8);
+
+-- 26. MENU_ITEM (M:N)
+insert into menu_item values ('ST01','M01','F01',350),('ST02','M02','F02',400),('ST03','M03','F03',80),('ST04','M04','F04',150),('ST05','M05','F05',200),('ST06','M06','F06',100),('ST07','M07','F07',120),('ST08','M08','F08',50),('ST09','M09','F09',180),('ST10','M10','F10',250),('ST11','M11','F11',350),('ST12','M12','F12',400),('ST13','M13','F13',80),('ST14','M14','F14',150),('ST15','M15','F15',200),('ST16','M16','F16',100),('ST17','M17','F17',120),('ST18','M18','F18',50),('ST19','M19','F19',180),('ST20','M20','F20',250),('ST21','M21','F21',350),('ST22','M22','F22',400),('ST23','M23','F23',80),('ST24','M24','F24',150),('ST25','M25','F25',200),('ST26','M26','F26',100),('ST27','M27','F27',120),('ST28','M28','F28',50),('ST29','M29','F29',180),('ST30','M30','F30',250);
+
+-- 27. SUPPLIES (M:N)
+insert into supplies values ('V01','F01','2024-10-01',200),('V02','F02','2024-10-01',250),('V03','F03','2024-10-01',50),('V04','F04','2024-10-01',100),('V05','F05','2024-10-01',150),('V06','F06','2024-10-01',80),('V07','F07','2024-10-01',90),('V08','F08','2024-10-01',30),('V09','F09','2024-10-01',120),('V10','F10','2024-10-01',200),('V11','F11','2024-10-01',200),('V12','F12','2024-10-01',250),('V13','F13','2024-10-01',50),('V14','F14','2024-10-01',100),('V15','F15','2024-10-01',150),('V16','F16','2024-10-01',80),('V17','F17','2024-10-01',90),('V18','F18','2024-10-01',30),('V19','F19','2024-10-01',120),('V20','F20','2024-10-01',200),('V21','F21','2024-10-01',200),('V22','F22','2024-10-01',250),('V23','F23','2024-10-01',50),('V24','F24','2024-10-01',100),('V25','F25','2024-10-01',150),('V26','F26','2024-10-01',80),('V27','F27','2024-10-01',90),('V28','F28','2024-10-01',30),('V29','F29','2024-10-01',120),('V30','F30','2024-10-01',200);
+
+
+-- 1. ADD COLUMN 
+alter table student add blood_group varchar(5);
+select * from student;
+
+-- 2. DROP COLUMN 
+alter table employee drop column emerg_name;
+select * from employee;
+
+-- 3. RENAME COLUMN 
+alter table vendor rename column contact_phone to vendor_phone;
+select * from vendor;
+
+-- 4. MODIFY DATA TYPE 
+alter table food_item modify column prep_time decimal(5,2);
+select * from food_item;
+
+-- 5. MODIFY DATA TYPE 
+alter table stall modify column monthly_rent int;
+select * from stall;
+
+
+-- DROP IMPLEMENTATION 
+create table student_backup as select * from student;
+
+
+drop table student_backup;
+
+
+select * from student_backup;
+
+-- 1. Retrieve all records using SELECT *
+select * from student;
+
+-- 2. Retrieve specific columns from selected tables
+select first_name, last_name, email from employee;
+
+
+-- 1. Update quries
+update student set student_status = 'Active' where student_id = 'S03';
+select * from student where student_id = 'S03';
+-- 2
+update employee set salary = 45000 where emp_id = 'E05';
+select * from employee where emp_id = 'E05';
+-- 3
+update food_item set unit_price = 320 where item_id = 'F01';
+select * from food_item where item_id = 'F01';
+-- 4
+update canteen_order set status = 'Served', served_time = '2024-10-25 13:45:00' where order_id = 'O02';
+select * from canteen_order where order_id = 'O02';
+-- 5
+update vendor set is_approved = true where vendor_id = 'V03';
+select * from vendor where vendor_id = 'V03';
+
+
+-- operators part D
+
+-- 1. Relational Operator (=): Find the student with ID S05
+select * from student where student_id = 'S05';
+
+-- 2. Relational Operator (<>): Find all food items that are NOT in the 'Fast Food' category
+select * from food_item where category <> 'Fast Food';
+
+-- 3. Relational Operator (!=): Find all employees who are NOT managers
+select * from employee where emp_status != 'Active';
+
+-- 4. Relational Operator (>): Find employees earning more than 60,000
+select * from employee where salary > 60000;
+
+-- 5. Relational Operator (<): Find food items priced under 100
+select * from food_item where unit_price < 100;
+
+-- 6. Relational Operator (>=): Find orders with a total amount of 400 or more
+select * from payment where amount >= 400;
+
+-- 7. Relational Operator (<=): Find food items that take 5 minutes or less to prepare
+select * from food_item where prep_time <= 5;
+
+-- 8. Logical Operator (AND): Find active employees who earn more than 50,000
+select * from employee where emp_status = 'Active' and salary > 50000;
+
+-- 9. Logical Operator (OR): Find students who are either 'Suspended' or 'Graduated'
+select * from student where student_status = 'Suspended' or student_status = 'Graduated';
+
+-- 10. Logical Operator (NOT): Find all orders that are NOT 'Served'
+select * from canteen_order where not status = 'Served';
+
+-- 11. Arithmetic Operator (+): Show employee salary with a 2000 bonus added
+select emp_id, salary, (salary + 2000) as salary_with_bonus from employee;
+
+-- 12. Arithmetic Operator (-): Show payment amount minus a 50 rupee discount
+select payment_id, amount, (amount - 50) as discounted_amount from payment;
+
+-- 13. Arithmetic Operator (*): Show food item price if we buy 3 quantities
+select item_name, unit_price, (unit_price * 3) as price_for_three from food_item;
+
+-- 14. Arithmetic Operator (/): Show the half price of food items
+select item_name, unit_price, (unit_price / 2) as half_price from food_item;
+
+-- 15. DISTINCT: Find unique categories in the food menu
+select distinct category from food_item;
+
+-- 16. GROUP BY: Count how many employees are in each status
+select emp_status, count(*) as total from employee group by emp_status;
+
+-- 17. HAVING: Show categories that have more than 2 food items
+select category, count(*) as item_count from food_item group by category
+ having count(*) > 2;
+
+-- 18. BETWEEN: Find employees whose salary is between 40,000 and 60,000
+select * from employee where salary between 40000 and 60000;
+
+-- 19. LIKE (Starts with): Find students whose first name starts with 'A'
+select * from student where first_name like 'A%';
+
+-- 20. LIKE (Ends with): Find employees whose email ends with 'pk'
+select * from employee where email like '%pk';
+
+-- 21. LIKE (Contains): Find vendors whose company name contains the word 'Food'
+select * from vendor where company_name like '%Food%';
+
+-- 22. IN: Find students who are in specific IDs (S01, S05, S10)
+select * from student where student_id in ('S01', 'S05', 'S10');
+
+-- 23. NOT IN: Find orders that are NOT in 'Placed' or 'Preparing' status
+select * from canteen_order where status not in ('Placed', 'Preparing');
+
+-- 24. ORDER BY (Ascending): Show all stalls ordered by their monthly rent from low to high
+select * from stall order by monthly_rent asc;
+
+-- 25. ORDER BY (Descending): Show food items ordered by highest price first
+select * from food_item order by unit_price desc;
+
+-- 26. ORDER BY with WHERE: Show active employees ordered by salary (highest first)
+select * from employee where emp_status = 'Active' order by salary desc;
+
+-- 27. IS NULL: Find orders where the table number is NULL (Takeaway orders)
+select * from canteen_order where table_no is null;
+
+-- 28. IS NOT NULL: Find payments where cash was received (not card/wallet)
+select * from payment where cash_received is not null;
+
+-- 29. Multi-condition: Find active students from Lahore
+select * from student where student_status = 'Active' and city = 'Lahore';
+
+-- 30. BETWEEN with Dates: Find orders placed between specific dates
+select * from canteen_order where order_datetime
+between '2024-10-25 13:00:00' and '2024-10-25 16:00:00';
+
+
+
+
+-- 1. INNER JOIN (Query 1): Show order details along with the student's first name.
+select o.order_id, o.order_type, s.first_name, s.last_name
+from canteen_order o
+inner join student s on o.student_id = s.student_id;
+
+-- 2. INNER JOIN (Query 2): Show food items and their offered price on menus.
+select f.item_name, m.offered_price
+from food_item f
+inner join menu_item m on f.item_id = m.item_id;
+
+-- 3. LEFT JOIN (Query 1): Show all students and their orders (even if they made no orders).
+select s.first_name, o.order_id
+from student s
+left join canteen_order o on s.student_id = o.student_id;
+
+-- 4. LEFT JOIN (Query 2): Show all employees and the stalls they work at (even if they work nowhere).
+select e.first_name, w.stall_id
+from employee e
+left join works_at w on e.emp_id = w.emp_id;
+
+-- 5. RIGHT JOIN (Query 1): Show all orders and the student who placed them (even if student ID is missing).
+select o.order_id, s.first_name
+from student s
+right join canteen_order o on s.student_id = o.student_id;
+
+-- 6. RIGHT JOIN (Query 2): Show all food items and any orders that included them.
+select ol.order_id, f.item_name
+from order_line ol
+right join food_item f on ol.item_id = f.item_id;
+
+-- 7. FULL OUTER JOIN (Query 1): (MySQL doesn't support FULL OUTER, so we use UNION of LEFT and RIGHT).
+select s.first_name, o.order_id
+from student s
+left join canteen_order o on s.student_id = o.student_id
+union
+select s.first_name, o.order_id
+from student s
+right join canteen_order o on s.student_id = o.student_id;
+
+-- 8. FULL OUTER JOIN (Query 2): Show all payments and their matching cash payment details.
+select p.payment_id, c.cash_received
+from payment p
+left join cash_payment c on p.payment_id = c.payment_id
+union
+select p.payment_id, c.cash_received
+from payment p
+right join cash_payment c on p.payment_id = c.payment_id;
+
+-- 9. CROSS JOIN (Query 1): Show every possible combination of stalls and food items.
+select s.stall_name, f.item_name
+from stall s
+cross join food_item f;
+
+-- 10. CROSS JOIN (Query 2): Show every combination of employees and vendors.
+select e.first_name, v.company_name
+from employee e
+cross join vendor v;
+
+-- 11. SELF JOIN (Query 1): Show employees who earn more than another employee.
+select a.first_name as emp1, b.first_name as emp2, a.salary, b.salary
+from employee a
+join employee b on a.salary > b.salary;
+
+-- 12. SELF JOIN (Query 2): Show students who live in the same city.
+select a.first_name as student1, b.first_name as student2, a.city
+from student a
+join student b on a.city = b.city and a.student_id < b.student_id;
+
+-- sub quries
+
+-- 1. Single-row Subquery: Find the employee with the highest salary.
+select first_name, last_name, salary from employee 
+where salary = (select max(salary) from employee);
+
+-- 2. Single-row Subquery: Find food items cheaper than the average price of all items.
+select item_name, unit_price from food_item 
+where unit_price < (select avg(unit_price) from food_item);
+
+-- 3. Multiple-row Subquery (IN): Find students who have placed at least one order.
+select first_name from student 
+where student_id in (select student_id from canteen_order);
+
+-- 4. Multiple-row Subquery (IN): Find food items that have never been ordered.
+select item_name from food_item 
+where item_id not in (select item_id from order_line);
+
+-- 5. Subquery with IN (Nested): Find vendors who supply 'Chicken Biryani'.
+select company_name from vendor 
+where vendor_id in (
+    select vendor_id from supplies 
+    where item_id in (select item_id from food_item where item_name = 'Chicken Biryani')
+);
+
+-- 6. Subquery with EXISTS: Find students who have given feedback.
+select first_name from student s 
+where exists (select 1 from feedback f where f.student_id = s.student_id);
+
+-- 7. Subquery with NOT EXISTS: Find vendors who have never supplied any food items.
+select company_name from vendor v 
+where not exists (select 1 from supplies s where s.vendor_id = v.vendor_id);
+
+-- 8. Correlated Subquery: Find food items more expensive than the average price in their own category.
+select f1.item_name, f1.unit_price, f1.category 
+from food_item f1
+where unit_price > (select avg(unit_price) from food_item f2 where f2.category = f1.category);
+
+-- 9. Correlated Subquery: Find employees who earn more than the average salary of all employees in their same status.
+select e1.first_name, e1.salary, e1.emp_status from employee e1
+where salary > (select avg(salary) from employee e2 where e2.emp_status = e1.emp_status);
+
+-- 10. Nested Subquery: Find the student who made the highest payment.
+select first_name, last_name from student 
+where student_id = (
+    select student_id from payment 
+    where amount = (select max(amount) from payment)
+);
+
+-- 11. ANY/ALL: Find employees who earn more than ANY employee who is 'On-leave'.
+select first_name, salary from employee 
+where salary > any (select salary from employee where emp_status = 'On-leave');
+
+-- 12. ANY/ALL: Find employees who earn more than ALL cashiers.
+select first_name, salary from employee 
+where salary > all (select e.salary from employee e join cashier c on e.emp_id = c.emp_id);
+
+-- 13. Subquery in SELECT clause: Show stall names along with the number of menus they have published.
+select stall_name, (select count(*) from menu m where m.stall_id = s.stall_id) as menu_count 
+from stall s;
+
+-- 14. Subquery with MIN: Find the cheapest food item.
+select item_name, unit_price from food_item 
+where unit_price = (select min(unit_price) from food_item);
+
+-- 15. Subquery with COUNT: Find vendors who have supplied more than 1 item.
+select company_name from vendor 
+where vendor_id in (select vendor_id from supplies group by vendor_id having count(item_id) > 1);
+
+-- 16. Subquery with IN and AND: Find active students who placed a paid order.
+select first_name from student 
+where student_status = 'Active' 
+and student_id in (select student_id from canteen_order where payment_status = 'Paid');
+
+-- 17. Nested Subquery (Most ordered): Find the food item that has been ordered the most times.
+select item_name from food_item 
+where item_id = (select item_id from order_line group by item_id order by sum(quantity) desc limit 1);
+
+-- 18. Subquery with AVG: Find payments that are higher than the average payment amount.
+select payment_id, amount from payment 
+where amount > (select avg(amount) from payment);
+
+-- 19. Subquery with NOT IN: Find employees who are NOT managers.
+select first_name, last_name from employee 
+where emp_id not in (select emp_id from manager);
+
+-- 20. Correlated Subquery with EXISTS: Find stalls that have received at least one order.
+select stall_name from stall s 
+where exists (select 1 from canteen_order o where o.stall_id = s.stall_id);
+
